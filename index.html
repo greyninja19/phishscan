@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PhishScan Pro</title>
+<style>
+:root {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --surface2: #1c2330;
+  --border: #30363d;
+  --text: #e6edf3;
+  --muted: #8b949e;
+  --accent: #58a6ff;
+  --green: #3fb950;
+  --yellow: #d29922;
+  --orange: #f0883e;
+  --red: #f85149;
+  --purple: #bc8cff;
+  --radius: 10px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 1rem 2rem; display: flex; align-items: center; gap: 12px; }
+header .logo { font-size: 1.4rem; font-weight: 700; color: var(--accent); letter-spacing: -0.5px; }
+header .badge { font-size: 10px; background: var(--accent); color: #000; padding: 2px 7px; border-radius: 99px; font-weight: 700; }
+header .tagline { margin-left: auto; font-size: 12px; color: var(--muted); }
+
+.container { max-width: 900px; margin: 0 auto; padding: 2rem 1rem; }
+
+.scan-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; margin-bottom: 2rem; }
+.scan-box h2 { font-size: 15px; font-weight: 600; margin-bottom: 1rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.input-row { display: flex; gap: 10px; }
+.input-row input {
+  flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+  color: var(--text); padding: 10px 14px; font-size: 14px; outline: none;
+  transition: border-color .2s;
+}
+.input-row input:focus { border-color: var(--accent); }
+.input-row input::placeholder { color: var(--muted); }
+.btn-scan {
+  background: var(--accent); color: #000; font-weight: 700; border: none;
+  border-radius: 8px; padding: 10px 22px; font-size: 14px; cursor: pointer;
+  transition: opacity .15s;
+}
+.btn-scan:hover { opacity: .85; }
+.btn-scan:disabled { opacity: .4; cursor: not-allowed; }
+
+.loader { display: none; margin-top: 1rem; }
+.loader.show { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
+.spinner { width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .6s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.results { display: none; }
+.results.show { display: block; }
+
+/* Verdict banner */
+.verdict { border-radius: var(--radius); padding: 1.5rem; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 1.5rem; }
+.verdict.safe    { background: #0e2e1a; border: 1px solid #2ea04320; }
+.verdict.suspicious { background: #2d2200; border: 1px solid #d2992230; }
+.verdict.phishing { background: #2d1400; border: 1px solid #f0883e40; }
+.verdict.danger  { background: #2d0808; border: 1px solid #f8514940; }
+.verdict-icon { font-size: 2.5rem; }
+.verdict-text .label { font-size: 1.3rem; font-weight: 800; }
+.verdict-text .sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+.score-ring { margin-left: auto; position: relative; width: 80px; height: 80px; }
+.score-ring svg { transform: rotate(-90deg); }
+.score-ring .score-num { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); font-size: 20px; font-weight: 800; }
+.score-ring .score-lbl { position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); font-size: 10px; color: var(--muted); white-space: nowrap; }
+
+/* Grid of cards */
+.cards { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
+@media (max-width: 600px) { .cards { grid-template-columns: 1fr; } }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.25rem; }
+.card-title { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 10px; }
+.card-row { display: flex; justify-content: space-between; align-items: flex-start; padding: 5px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.card-row:last-child { border-bottom: none; }
+.card-row .k { color: var(--muted); }
+.card-row .v { font-weight: 500; text-align: right; max-width: 65%; word-break: break-all; }
+.ok { color: var(--green); }
+.warn { color: var(--yellow); }
+.bad { color: var(--red); }
+.muted { color: var(--muted); }
+
+/* Reasons list */
+.reasons-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1.5rem; }
+.reason-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+.reason-item:last-child { border-bottom: none; }
+.reason-empty { color: var(--green); font-size: 14px; }
+
+/* Redirect chain */
+.chain-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1.5rem; }
+.chain-step { display: flex; align-items: flex-start; gap: 10px; padding: 6px 0; font-size: 13px; }
+.chain-code { background: var(--surface2); border-radius: 4px; padding: 1px 8px; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+.code-2xx { color: var(--green); }
+.code-3xx { color: var(--yellow); }
+.code-4xx, .code-5xx { color: var(--red); }
+.chain-url { word-break: break-all; color: var(--muted); }
+
+/* DNS */
+.dns-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1.5rem; }
+.dns-row { display: flex; gap: 10px; padding: 5px 0; font-size: 12px; border-bottom: 1px solid var(--border); font-family: monospace; }
+.dns-row:last-child { border-bottom: none; }
+.dns-type { color: var(--accent); font-weight: 700; min-width: 48px; }
+.dns-val { color: var(--muted); word-break: break-all; }
+
+.section-title { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 10px; }
+</style>
+</head>
+<body>
+<header>
+  <span class="logo">PhishScan</span>
+  <span class="badge">PRO</span>
+  <span class="tagline">Advanced Phishing URL Detector</span>
+</header>
+
+<div class="container">
+  <div class="scan-box">
+    <h2>Scan a URL</h2>
+    <div class="input-row">
+      <input id="urlInput" type="text" placeholder="https://suspicious-site.com/login?verify=account" />
+      <button class="btn-scan" id="scanBtn" onclick="doScan()">Scan →</button>
+    </div>
+    <div class="loader" id="loader">
+      <div class="spinner"></div>
+      <span id="loaderMsg">Collecting threat intelligence...</span>
+    </div>
+  </div>
+
+  <div class="results" id="results"></div>
+</div>
+
+<script>
+const loaderMsgs = [
+  'Resolving domain & IP…',
+  'Fetching WHOIS data…',
+  'Checking SSL certificate…',
+  'Following redirect chain…',
+  'Querying DNS records…',
+  'Checking SPF / DMARC…',
+  'Analysing URL patterns…',
+  'Running scoring engine…',
+];
+
+let msgInterval;
+
+async function doScan() {
+  const url = document.getElementById('urlInput').value.trim();
+  if (!url) return;
+
+  document.getElementById('scanBtn').disabled = true;
+  document.getElementById('loader').classList.add('show');
+  document.getElementById('results').classList.remove('show');
+
+  let i = 0;
+  msgInterval = setInterval(() => {
+    document.getElementById('loaderMsg').textContent = loaderMsgs[i % loaderMsgs.length];
+    i++;
+  }, 900);
+
+  try {
+    const res = await fetch('/api/scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url })
+    });
+    const d = await res.json();
+    renderResults(d);
+  } catch (e) {
+    document.getElementById('results').innerHTML = `<div style="color:var(--red);padding:1rem">Error: ${e.message}</div>`;
+    document.getElementById('results').classList.add('show');
+  } finally {
+    clearInterval(msgInterval);
+    document.getElementById('loader').classList.remove('show');
+    document.getElementById('scanBtn').disabled = false;
+  }
+}
+
+document.getElementById('urlInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doScan();
+});
+
+function verdictColor(level) {
+  return { safe: 'var(--green)', suspicious: 'var(--yellow)', phishing: 'var(--orange)', danger: 'var(--red)' }[level] || 'var(--muted)';
+}
+
+function scoreColor(s) {
+  if (s < 25) return 'var(--green)';
+  if (s < 50) return 'var(--yellow)';
+  if (s < 75) return 'var(--orange)';
+  return 'var(--red)';
+}
+
+function scoreRing(score) {
+  const r = 34, circ = 2 * Math.PI * r;
+  const dash = circ * (1 - score / 100);
+  const col = scoreColor(score);
+  return `
+    <div class="score-ring">
+      <svg width="80" height="80" viewBox="0 0 80 80">
+        <circle cx="40" cy="40" r="${r}" fill="none" stroke="var(--border)" stroke-width="7"/>
+        <circle cx="40" cy="40" r="${r}" fill="none" stroke="${col}" stroke-width="7"
+          stroke-dasharray="${circ}" stroke-dashoffset="${dash}" stroke-linecap="round"/>
+      </svg>
+      <span class="score-num" style="color:${col}">${score}</span>
+      <span class="score-lbl">Risk score</span>
+    </div>`;
+}
+
+function codeClass(c) {
+  if (c >= 200 && c < 300) return 'code-2xx';
+  if (c >= 300 && c < 400) return 'code-3xx';
+  return 'code-4xx';
+}
+
+function renderResults(d) {
+  if (d.error) {
+    document.getElementById('results').innerHTML = `<div style="color:var(--red);padding:1rem">⚠ ${d.error}</div>`;
+    document.getElementById('results').classList.add('show');
+    return;
+  }
+
+  const rl = d.risk_level;
+  const vcol = verdictColor(rl);
+
+  let html = `
+  <div class="verdict ${rl}">
+    <div class="verdict-text">
+      <div class="label" style="color:${vcol}">${d.risk}</div>
+      <div class="sub">${d.domain} &nbsp;·&nbsp; ${d.ip} &nbsp;·&nbsp; Scanned at ${d.scanned_at?.replace('T',' ').replace('Z','') || '–'} UTC</div>
+    </div>
+    ${scoreRing(d.score)}
+  </div>
+
+  <div class="cards">
+    <div class="card">
+      <div class="card-title">Domain info</div>
+      <div class="card-row"><span class="k">Domain</span><span class="v">${d.domain}</span></div>
+      <div class="card-row"><span class="k">IP Address</span><span class="v">${d.ip}</span></div>
+      <div class="card-row"><span class="k">Domain age</span><span class="v ${d.age_days < 90 && d.age_days >= 0 ? 'warn' : 'ok'}">${d.age_days >= 0 ? d.age_days + ' days' : 'Unknown'}</span></div>
+      <div class="card-row"><span class="k">Shortener</span><span class="v ${d.is_shortener ? 'warn' : 'ok'}">${d.is_shortener ? 'Yes ⚠' : 'No'}</span></div>
+      <div class="card-row"><span class="k">Homograph</span><span class="v ${d.is_homograph ? 'bad' : 'ok'}">${d.is_homograph ? 'Detected 🚨' : 'None'}</span></div>
+      <div class="card-row"><span class="k">DGA domain</span><span class="v ${d.is_dga ? 'bad' : 'ok'}">${d.is_dga ? 'Likely 🤖' : 'No'}</span></div>
+      ${d.impersonated_brands?.length ? `<div class="card-row"><span class="k">Impersonating</span><span class="v bad">${d.impersonated_brands.join(', ')}</span></div>` : ''}
+    </div>
+
+    <div class="card">
+      <div class="card-title">SSL / TLS</div>
+      <div class="card-row"><span class="k">Certificate</span><span class="v ${d.ssl?.valid ? 'ok' : 'bad'}">${d.ssl?.valid ? 'Valid ✓' : 'Invalid ✗'}</span></div>
+      <div class="card-row"><span class="k">Issuer</span><span class="v">${d.ssl?.issuer || '–'}</span></div>
+      <div class="card-row"><span class="k">Expiry</span><span class="v">${d.ssl?.expiry || '–'}</span></div>
+      <div class="card-row"><span class="k">Days left</span><span class="v ${d.ssl?.days_left < 30 ? 'warn' : 'ok'}">${d.ssl?.days_left >= 0 ? d.ssl.days_left : '–'}</span></div>
+      <div class="card-row"><span class="k">Self-signed</span><span class="v ${d.ssl?.self_signed ? 'warn' : 'ok'}">${d.ssl?.self_signed ? 'Yes ⚠' : 'No'}</span></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Email security</div>
+      <div class="card-row"><span class="k">SPF record</span><span class="v ${d.spf ? 'ok' : 'warn'}">${d.spf ? 'Present ✓' : 'Missing ✗'}</span></div>
+      <div class="card-row"><span class="k">DMARC record</span><span class="v ${d.dmarc ? 'ok' : 'warn'}">${d.dmarc ? 'Present ✓' : 'Missing ✗'}</span></div>
+      <div class="card-row"><span class="k">MX records</span><span class="v ${d.dns?.MX?.length ? 'ok' : 'warn'}">${d.dns?.MX?.length ? 'Present ✓' : 'Missing ✗'}</span></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">URL features</div>
+      <div class="card-row"><span class="k">Length</span><span class="v ${d.features?.length > 100 ? 'warn' : 'ok'}">${d.features?.length} chars</span></div>
+      <div class="card-row"><span class="k">Path depth</span><span class="v">${d.features?.depth}</span></div>
+      <div class="card-row"><span class="k">Subdomains</span><span class="v ${d.features?.subdomain_count >= 3 ? 'warn' : 'ok'}">${d.features?.subdomain_count}</span></div>
+      <div class="card-row"><span class="k">Has @</span><span class="v ${d.features?.num_at ? 'bad' : 'ok'}">${d.features?.num_at ? 'Yes ⚠' : 'No'}</span></div>
+      <div class="card-row"><span class="k">Non-std port</span><span class="v ${d.features?.has_port ? 'warn' : 'ok'}">${d.features?.has_port ? 'Yes ⚠' : 'No'}</span></div>
+      <div class="card-row"><span class="k">Encoded chars</span><span class="v ${d.features?.encoded_chars > 5 ? 'warn' : 'ok'}">${d.features?.encoded_chars}</span></div>
+    </div>
+  </div>`;
+
+  // Risk factors
+  html += `<div class="reasons-card">
+    <div class="section-title">Risk factors (${d.reasons?.length || 0})</div>`;
+  if (d.reasons?.length) {
+    d.reasons.forEach(r => {
+      html += `<div class="reason-item">${r}</div>`;
+    });
+  } else {
+    html += `<div class="reason-empty">✅ No risk factors detected</div>`;
+  }
+  html += `</div>`;
+
+  // Redirect chain
+  if (d.redirect_chain?.length) {
+    html += `<div class="chain-card">
+      <div class="section-title">Redirect chain (${d.redirect_chain.length} hops)</div>`;
+    d.redirect_chain.forEach((step, i) => {
+      html += `<div class="chain-step">
+        <span class="chain-code ${codeClass(step.code)}">${step.code}</span>
+        <span class="chain-url">${step.url}</span>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  // DNS records
+  const dnsTypes = ['A', 'AAAA', 'MX', 'NS', 'TXT'];
+  const hasDns = dnsTypes.some(t => d.dns?.[t]?.length);
+  if (hasDns) {
+    html += `<div class="dns-card">
+      <div class="section-title">DNS records</div>`;
+    dnsTypes.forEach(t => {
+      (d.dns?.[t] || []).forEach(val => {
+        html += `<div class="dns-row"><span class="dns-type">${t}</span><span class="dns-val">${val}</span></div>`;
+      });
+    });
+    html += `</div>`;
+  }
+
+  document.getElementById('results').innerHTML = html;
+  document.getElementById('results').classList.add('show');
+  document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
+}
+</script>
+</body>
+</html>
